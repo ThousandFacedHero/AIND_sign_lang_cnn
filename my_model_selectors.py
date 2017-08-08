@@ -76,7 +76,7 @@ class SelectorBIC(ModelSelector):
         """
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-        # TODO implement model selection based on BIC scores
+        # model selection based on BIC scores
         bic_score = float('inf')
         best_model = self.min_n_components
         for n in range(self.min_n_components, self.max_n_components):
@@ -85,31 +85,61 @@ class SelectorBIC(ModelSelector):
                                        n_iter=1000, random_state=self.random_state,
                                        verbose=False).fit(self.X, self.lengths)
                 log_l = temp_hmm.score(self.X, self.lengths)
+                # calculate free parameters
                 p = (n*n)+(2*n)*(len(self.X[0])-1)
+                # calculate bic for comparison
                 temp_bic = -2 * log_l * math.log(len(self.X[0])) * p
                 if temp_bic < bic_score:
                     bic_score = temp_bic
                     best_model = n
-            except:
+            except DeprecationWarning:
                 pass
 
         return self.base_model(best_model)
 
 
 class SelectorDIC(ModelSelector):
-    ''' select best model based on Discriminative Information Criterion
+    """ select best model based on Discriminative Information Criterion
 
     Biem, Alain. "A model selection criterion for classification: Application to hmm topology optimization."
     Document Analysis and Recognition, 2003. Proceedings. Seventh International Conference on. IEEE, 2003.
     http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.58.6208&rep=rep1&type=pdf
     DIC = log(P(X(i)) - 1/(M-1)SUM(log(P(X(all but i))
-    '''
+    """
 
     def select(self):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
         # TODO implement model selection based on DIC scores
-        raise NotImplementedError
+        dic_score = float('-inf')
+        best_model = self.min_n_components
+
+        for n in range(self.min_n_components, self.max_n_components):
+            try:
+                temp_hmm = GaussianHMM(n_components=n, covariance_type="diag",
+                                       n_iter=1000, random_state=self.random_state,
+                                       verbose=False).fit(self.X, self.lengths)
+                log_l = temp_hmm.score(self.X, self.lengths)
+
+                word_vals = []
+                try:
+                    for word in self.words:
+                        if word != self.this_word:
+                            word_x, word_len = self.hwords[word]
+                            temp_word_hmm = GaussianHMM(n_components=n, covariance_type="diag",
+                                                        n_iter=1000, random_state=self.random_state,
+                                                        verbose=False).fit(word_x, word_len)
+                            word_vals.append(temp_word_hmm.score(word_x, word_len))
+                except DeprecationWarning:
+                    pass
+                temp_dic = log_l - (sum(word_vals)/len(word_vals))
+                if temp_dic > dic_score:
+                    dic_score = temp_dic
+                    best_model = n
+            except DeprecationWarning:
+                pass
+
+        return self.base_model(best_model)
 
 
 class SelectorCV(ModelSelector):
