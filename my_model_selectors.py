@@ -77,7 +77,23 @@ class SelectorBIC(ModelSelector):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
         # TODO implement model selection based on BIC scores
-        raise NotImplementedError
+        bic_score = float('inf')
+        best_model = self.min_n_components
+        for n in range(self.min_n_components, self.max_n_components):
+            try:
+                temp_hmm = GaussianHMM(n_components=n, covariance_type="diag",
+                                       n_iter=1000, random_state=self.random_state,
+                                       verbose=False).fit(self.X, self.lengths)
+                log_l = temp_hmm.score(self.X, self.lengths)
+                p = (n*n)+(2*n)*(len(self.X[0])-1)
+                temp_bic = -2 * log_l * math.log(len(self.X[0])) * p
+                if temp_bic < bic_score:
+                    bic_score = temp_bic
+                    best_model = n
+            except:
+                pass
+
+        return self.base_model(best_model)
 
 
 class SelectorDIC(ModelSelector):
