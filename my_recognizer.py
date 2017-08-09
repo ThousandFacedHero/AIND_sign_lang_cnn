@@ -20,10 +20,11 @@ def recognize(models: dict, test_set: SinglesData):
     warnings.filterwarnings("ignore", category=DeprecationWarning)
     probabilities = []
     guesses = []
-
+    # split the test data from the SinglesData object
     test_list = list(test_set.get_all_Xlengths().values())
     for test_x, test_len in test_list:
         score = {}
+        # get the score for each model from the test data set
         for word, model in models.items():
             try:
                 score[word] = model.score(test_x, test_len)

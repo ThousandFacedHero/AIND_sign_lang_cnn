@@ -156,6 +156,7 @@ class SelectorCV(ModelSelector):
         for n in range(self.min_n_components, self.max_n_components+1):
             scores = []
             try:
+                # train/score on rotating folds
                 for train, test in split_cv.split(self.sequences):
                     try:
                         x_train, x_train_lens = combine_sequences(train, self.sequences)
@@ -166,6 +167,7 @@ class SelectorCV(ModelSelector):
                         scores.append(temp_hmm.score(x_test, x_test_lens))
                     except:
                         pass
+                # calculate score and set if better than previous
                 iter_score = np.mean(scores)
                 if iter_score > cv_score:
                     cv_score = iter_score
