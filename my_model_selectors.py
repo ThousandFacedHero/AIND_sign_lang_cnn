@@ -79,7 +79,7 @@ class SelectorBIC(ModelSelector):
         # model selection based on BIC scores
         bic_score = float('inf')
         best_model = self.min_n_components
-        for n in range(self.min_n_components, self.max_n_components):
+        for n in range(self.min_n_components, self.max_n_components+1):
             try:
                 temp_hmm = GaussianHMM(n_components=n, covariance_type="diag",
                                        n_iter=1000, random_state=self.random_state,
@@ -92,7 +92,7 @@ class SelectorBIC(ModelSelector):
                 if temp_bic < bic_score:
                     bic_score = temp_bic
                     best_model = n
-            except DeprecationWarning:
+            except:
                 pass
 
         return self.base_model(best_model)
@@ -110,33 +110,32 @@ class SelectorDIC(ModelSelector):
     def select(self):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-        # TODO implement model selection based on DIC scores
+        # model selection based on DIC scores
         dic_score = float('-inf')
-        best_model = self.min_n_components
+        best_model = self.max_n_components
 
-        for n in range(self.min_n_components, self.max_n_components):
+        for n in range(self.min_n_components, self.max_n_components+1):
             try:
                 temp_hmm = GaussianHMM(n_components=n, covariance_type="diag",
                                        n_iter=1000, random_state=self.random_state,
                                        verbose=False).fit(self.X, self.lengths)
                 log_l = temp_hmm.score(self.X, self.lengths)
-
+                # use word_vals list to store scores for each word, used to calculate DIC score
                 word_vals = []
-                try:
-                    for word in self.words:
+                for word in self.words:
+                    try:
                         if word != self.this_word:
                             word_x, word_len = self.hwords[word]
-                            temp_word_hmm = GaussianHMM(n_components=n, covariance_type="diag",
-                                                        n_iter=1000, random_state=self.random_state,
-                                                        verbose=False).fit(word_x, word_len)
-                            word_vals.append(temp_word_hmm.score(word_x, word_len))
-                except DeprecationWarning:
-                    pass
-                temp_dic = log_l - (sum(word_vals)/len(word_vals))
-                if temp_dic > dic_score:
-                    dic_score = temp_dic
-                    best_model = n
-            except DeprecationWarning:
+                            word_vals.append(temp_hmm.score(word_x, word_len))
+                    except:
+                        pass
+                if len(word_vals) != 0:
+                    # calculate DIC score for this n
+                    temp_dic = log_l - (sum(word_vals)/len(word_vals))
+                    if temp_dic > dic_score:
+                        dic_score = temp_dic
+                        best_model = n
+            except:
                 pass
 
         return self.base_model(best_model)
@@ -150,5 +149,27 @@ class SelectorCV(ModelSelector):
     def select(self):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-        # TODO implement model selection using CV
-        raise NotImplementedError
+        # model selection using CV
+        cv_score = float('-inf')
+        best_cv = self.max_n_components
+        split_cv = KFold()
+        for n in range(self.min_n_components, self.max_n_components+1):
+            scores = []
+            try:
+                for train, test in split_cv.split(self.sequences):
+                    try:
+                        x_train, x_train_lens = combine_sequences(train, self.sequences)
+                        x_test, x_test_lens = combine_sequences(test, self.sequences)
+                        temp_hmm = GaussianHMM(n_components=n, covariance_type="diag",
+                                               n_iter=1000, random_state=self.random_state,
+                                               verbose=False).fit(x_train, x_train_lens)
+                        scores.append(temp_hmm.score(x_test, x_test_lens))
+                    except:
+                        pass
+                iter_score = np.mean(scores)
+                if iter_score > cv_score:
+                    cv_score = iter_score
+                    best_cv = n
+            except:
+                pass
+        return self.base_model(best_cv)
